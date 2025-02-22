@@ -3,9 +3,10 @@ package router
 import (
 	"github.com/gofiber/fiber/v3"
 	handlers "github.com/senthan-07/outpassBE/Handlers"
+	"gorm.io/gorm"
 )
 
-func SetupRoutes(app *fiber.App) {
+func SetupRoutes(app *fiber.App, ddb *gorm.DB) {
 	app.Get("/auth", handlers.GetAuth)
 	app.Post("/student/outpass/apply", handlers.ApplyOutpass)
 	app.Post("/warden/outpass/regular/dates", handlers.SetRegularOutpassDates)     //set dates for warden
