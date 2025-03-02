@@ -2,26 +2,24 @@ package models
 
 import (
 	"time"
-
-	"gorm.io/gorm"
 )
 
 type Outpass struct {
-	ID           uint `gorm:"primaryKey"`
-	StudentID    uint
-	Student      Student
-	OutpassType  string
-	Status       string
-	ValidFrom    time.Time
-	ValidUntil   time.Time
-	ApprovedByID uint
-	ApprovedBy   User
+	ID           uint64    `gorm:"primaryKey"`
+	StudentID    uint64    `gorm:"not null"`
+	Student      Student   `gorm:"foreignKey:StudentID"`
+	OutpassType  string    `gorm:"type:text"`
+	Status       string    `gorm:"type:text"`
+	ValidFrom    time.Time `gorm:"type:timestamptz"`
+	ValidUntil   time.Time `gorm:"type:timestamptz"`
+	ApprovedByID uint64    `gorm:"not null"`
+	ApprovedBy   User      `gorm:"foreignKey:ApprovedByID"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
 
 type User struct {
-	gorm.Model
-	Name  string
-	Email string
+	ID    uint64 `gorm:"primaryKey"`
+	Name  string `gorm:"type:text"`
+	Email string `gorm:"type:text;unique"`
 }
