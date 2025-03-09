@@ -13,8 +13,9 @@ type Outpass struct {
 	Status       string         `gorm:"default:Pending" json:"status"`
 	ValidFrom    time.Time      `gorm:"not null" json:"valid_from"`
 	ValidUntil   time.Time      `gorm:"not null" json:"valid_until"`
-	ApprovedByID *uint64        `json:"approved_by_id"`                // Can be warden or teacher
-	ApproverType string         `gorm:"not null" json:"approver_type"` // "warden" or "teacher"
+	ApprovedByID *uint64        `json:"approved_by_id"`                // Will be set during approval
+	ApproverType string         `gorm:"not null" json:"approver_type"` // Sent by request
+	ApproverName string         `gorm:"not null" json:"approver_name"` // Sent by request
 	CreatedAt    time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
@@ -30,12 +31,6 @@ type OutpassResponse struct {
 	ApprovedByID *uint     `json:"approved_by_id,omitempty"` // Omitting null values
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type User struct {
-	ID    uint64 `gorm:"primaryKey"`
-	Name  string `gorm:"type:text"`
-	Email string `gorm:"type:text;unique"`
 }
 
 type Notification struct {

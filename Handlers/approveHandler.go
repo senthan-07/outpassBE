@@ -9,62 +9,46 @@ import (
 	"gorm.io/gorm"
 )
 
-// ApproveOutpass handles approval of an outpass by a Warden or Teacher.
+// ApproveOutpass handles approval or rejection of an outpass by a Warden or Teacher.
 func ApproveOutpass(c fiber.Ctx) error {
 	db, ok := c.Locals("db").(*gorm.DB)
 	if !ok {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database connection error"})
 	}
 
-	outpassIDStr := c.Params("outpass_id")
-	fmt.Println("Raw outpass_id:", outpassIDStr)
 	// Get the outpass ID from URL params
 	outpassID, err := strconv.ParseUint(c.Params("outpass_id"), 10, 64)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid outpass ID"})
 	}
 
-	// Debug: Print outpassID
-	fmt.Printf("Parsed Outpass ID: %d\n", outpassID)
-
-	// Fetch outpass from database
+	// Fetch the outpass record
 	var outpass models.Outpass
 	if err := db.First(&outpass, uint(outpassID)).Error; err != nil {
-		fmt.Println("Outpass not found in DB")
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Outpass not found"})
 	}
 
-	fmt.Println("Outpass found:", outpass.ID)
-
 	// Parse the request body
 	var req struct {
-		ApproverID   uint64 `json:"approver_id"`
-		ApproverType string `json:"approver_type"`
-		Status       string `json:"status"`
+		ApproverName string `json:"approver_name"` // Approver identified by Name
+		ApproverType string `json:"approver_type"` // "Warden" or "Teacher"
+		Status       string `json:"status"`        // "Approved" or "Rejected"
 	}
 
 	if err := c.Bind().JSON(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request format"})
 	}
 
-	// Check if the approver exists
+	// Validate Approver Exists
 	if req.ApproverType == "Warden" {
 		var warden models.Warden
-		if err := db.First(&warden, req.ApproverID).Error; err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error":         "Invalid Approver ID",
-				"approver_id":   req.ApproverID,
-				"approver_type": req.ApproverType,
-			})
+		if err := db.Where("name = ?", req.ApproverName).First(&warden).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Warden not found"})
 		}
 	} else if req.ApproverType == "Teacher" {
 		var teacher models.Teacher
-		if err := db.First(&teacher, req.ApproverID).Error; err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error":         "Invalid Approver ID",
-				"approver_id":   req.ApproverID,
-				"approver_type": req.ApproverType,
-			})
+		if err := db.Where("name = ?", req.ApproverName).First(&teacher).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Teacher not found"})
 		}
 	} else {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Approver Type"})
@@ -72,23 +56,35 @@ func ApproveOutpass(c fiber.Ctx) error {
 
 	// Update the outpass status
 	outpass.Status = req.Status
-	outpass.ApprovedByID = &req.ApproverID
+	outpass.ApproverName = req.ApproverName
 	outpass.ApproverType = req.ApproverType
 
 	if err := db.Save(&outpass).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update outpass status"})
 	}
 
-	// Send notification to the student
-	notification := models.Notification{
-		UserID:  outpass.StudentID,
-		Message: "Your outpass request has been " + req.Status + " by " + req.ApproverType,
-		Read:    false,
+	// Send Email Notification to Student
+	var student models.Student
+	if err := db.First(&student, outpass.StudentID).Error; err == nil {
+		emailSubject := fmt.Sprintf("Your Outpass Request has been %s", req.Status)
+		emailBody := fmt.Sprintf(`
+			<p>Dear %s,</p>
+			<p>Your outpass request has been <b>%s</b> by <b>%s (%s)</b>.</p>
+			<p><b>Details:</b></p>
+			<ul>
+				<li><b>Outpass Type:</b> %s</li>
+				<li><b>Valid From:</b> %s</li>
+				<li><b>Valid Until:</b> %s</li>
+			</ul>
+			<p>Thank you.</p>
+		`, student.Name, req.Status, req.ApproverName, req.ApproverType, outpass.OutpassType, outpass.ValidFrom, outpass.ValidUntil)
+
+		// Send email using common system email (not approver's email)
+		go sendEmail(student.Email, emailSubject, emailBody)
 	}
-	db.Create(&notification)
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Outpass approved successfully",
+		"message": "Outpass status updated successfully",
 		"outpass": outpass,
 	})
 }

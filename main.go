@@ -35,11 +35,10 @@ func init() {
 	if db.Migrator().HasTable(&models.Student{}) &&
 		db.Migrator().HasTable(&models.Teacher{}) &&
 		db.Migrator().HasTable(&models.Warden{}) &&
-		db.Migrator().HasTable(&models.Outpass{}) &&
-		db.Migrator().HasTable(&models.User{}) {
+		db.Migrator().HasTable(&models.Outpass{}) {
 		log.Println("Tables already exist, skipping migration.")
 	} else {
-		errMigrate := db.AutoMigrate(&models.Student{}, &models.Teacher{}, &models.Warden{}, &models.Outpass{}, &models.User{})
+		errMigrate := db.AutoMigrate(&models.Student{}, &models.Teacher{}, &models.Warden{}, &models.Outpass{})
 		if errMigrate != nil {
 			log.Fatal("Migration failed:", errMigrate)
 		} else {
@@ -83,16 +82,6 @@ func seedDatabase(db *gorm.DB) {
 			Password: "hashedpassword",
 		})
 		log.Println("Inserted test warden")
-	}
-
-	// Seed Users (Approvers)
-	if err := db.First(&models.User{}, 1).Error; err != nil {
-		db.Create(&models.User{
-			ID:    1,
-			Name:  "Admin",
-			Email: "admin@university.com",
-		})
-		log.Println("Inserted test user")
 	}
 }
 
